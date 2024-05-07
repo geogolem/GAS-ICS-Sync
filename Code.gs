@@ -31,7 +31,7 @@ var sourceCalendars = [                // The ics/ical urls that you want to get
 
 ];
 
-var howFrequent = 15;                     // What interval (minutes) to run this script on to check for new events
+var howFrequent = 15;                     // What interval (minutes) to run this script on to check for new events.  Any integer can be used, but will be rounded up to 5, 10, 15, 30 or to the nearest hour after that.. 60, 120, etc. 1440 (24 hours) is the maximum value.  Anything above that will be replaced with 1440.
 var onlyFutureEvents = false;             // If you turn this to "true", past events will not be synced (this will also removed past events from the target calendar if removeEventsFromCalendar is true)
 var addEventsToCalendar = true;           // If you turn this to "false", you can check the log (View > Logs) to make sure your events are being read correctly before turning this on
 var modifyExistingEvents = true;          // If you turn this to "false", any event in the feed that was modified after being added to the calendar will not update
@@ -49,6 +49,8 @@ var addTasks = false;
 
 var emailSummary = false;                 // Will email you when an event is added/modified/removed to your calendar
 var email = "";                           // OPTIONAL: If "emailSummary" is set to true or you want to receive update notifications, you will need to provide your email address
+var customEmailSubject = "";              // OPTIONAL: If you want to change the email subject, provide a custom one here. Default: "GAS-ICS-Sync Execution Summary"
+var dateFormat = "YYYY-MM-DD"             // date format in the email summary (e.g. "YYYY-MM-DD", "DD.MM.YYYY", "MM/DD/YYYY". separators are ".", "-" and "/")
 
 /*
 *=========================================
@@ -97,16 +99,30 @@ var email = "";                           // OPTIONAL: If "emailSummary" is set 
 
 var defaultMaxRetries = 10; // Maximum number of retries for api functions (with exponential backoff)
 
-function install(){
-  //Delete any already existing triggers so we don't create excessive triggers
+function install() {
+  // Delete any already existing triggers so we don't create excessive triggers
   deleteAllTriggers();
 
-  //Schedule sync routine to explicitly repeat and schedule the initial sync
-  ScriptApp.newTrigger("startSync").timeBased().everyMinutes(getValidTriggerFrequency(howFrequent)).create();
+  // Schedule sync routine to explicitly repeat and schedule the initial sync
+  var adjustedMinutes = getValidTriggerFrequency(howFrequent);
+  if (adjustedMinutes >= 60) {
+    ScriptApp.newTrigger("startSync")
+      .timeBased()
+      .everyHours(adjustedMinutes / 60)
+      .create();
+  } else {
+    ScriptApp.newTrigger("startSync")
+      .timeBased()
+      .everyMinutes(adjustedMinutes)
+      .create();
+  }
   ScriptApp.newTrigger("startSync").timeBased().after(1000).create();
 
-  //Schedule sync routine to look for update once per day
-  ScriptApp.newTrigger("checkForUpdate").timeBased().everyDays(1).create();
+  // Schedule sync routine to look for update once per day using everyDays
+  ScriptApp.newTrigger("checkForUpdate")
+    .timeBased()
+    .everyDays(1)
+    .create();
 }
 
 function uninstall(){
@@ -138,7 +154,7 @@ function startSync(){
   PropertiesService.getUserProperties().setProperty('LastRun', new Date().getTime());
 
   if (onlyFutureEvents)
-    startUpdateTime = new ICAL.Time.fromJSDate(new Date());
+    startUpdateTime = new ICAL.Time.fromJSDate(new Date(), true);
 
   //Disable email notification if no mail adress is provided
   emailSummary = emailSummary && email != "";

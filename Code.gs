@@ -173,12 +173,8 @@ function startSync(){
     var vevents;
 
     //------------------------ Fetch URL items ------------------------
-    try{
-      var responses = fetchSourceCalendars(sourceCalendarURLs);
-    }
-    catch(e)
-    {
-      Logger.log(e);
+    var responses = fetchSourceCalendars(sourceCalendarURLs);
+    if (responses.length == 0) {
       Logger.log("Skipping " + targetCalendarName);
       continue;
     }
